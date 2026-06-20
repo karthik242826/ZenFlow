@@ -1423,8 +1423,20 @@ function setupEventListeners() {
         showToast('Signed in successfully!');
       } catch (err) {
         console.error(err);
-        updateCloudStatus('error');
-        showToast(err.message, 'error');
+        if (err.code === 'auth/user-not-found') {
+          try {
+            showToast('User not found. Auto-registering account...', 'info');
+            await window.firebaseSync.signUp(email, password);
+            showToast('Account auto-created and signed in!');
+          } catch (signUpErr) {
+            console.error(signUpErr);
+            updateCloudStatus('error');
+            showToast(signUpErr.message, 'error');
+          }
+        } else {
+          updateCloudStatus('error');
+          showToast(err.message, 'error');
+        }
       }
     });
   }
@@ -1554,28 +1566,46 @@ async function syncLocalToCloud() {
   }
 }
 
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC3-84toSLUqyFJcTtbjwZL5tsLaC2FnrQ",
+  authDomain: "zenflow-c8c2e.firebaseapp.com",
+  projectId: "zenflow-c8c2e",
+  storageBucket: "zenflow-c8c2e.firebasestorage.app",
+  messagingSenderId: "601230152272",
+  appId: "1:601230152272:web:8a8d480dca9f3ca24b7755",
+  measurementId: "G-HLWYEMCZMV"
+};
+
 function initFirebaseSync() {
+  let config = null;
   const savedConfig = localStorage.getItem('zenflow-firebase-config');
+  
   if (savedConfig) {
     try {
-      const config = JSON.parse(savedConfig);
-      
-      // Populate configuration fields
-      DOM.cloudApiKey.value = config.apiKey || '';
-      DOM.cloudProjectId.value = config.projectId || '';
-      DOM.cloudAuthDomain.value = config.authDomain || '';
-      DOM.cloudMessagingId.value = config.messagingSenderId || '';
-      DOM.cloudAppId.value = config.appId || '';
-      
-      const success = window.firebaseSync.init(config);
-      if (success) {
-        window.firebaseSync.onAuthStateChanged(handleAuthStateChanged);
-        updateCloudStatus('local-auth-required');
-      } else {
-        updateCloudStatus('error');
-      }
+      config = JSON.parse(savedConfig);
     } catch (e) {
       console.error('Failed to parse Firebase config:', e);
+    }
+  }
+  
+  // Fallback to pre-configured Firebase database out-of-the-box
+  if (!config) {
+    config = DEFAULT_FIREBASE_CONFIG;
+  }
+
+  if (config && config.apiKey) {
+    // Populate configuration fields in the modal
+    DOM.cloudApiKey.value = config.apiKey || '';
+    DOM.cloudProjectId.value = config.projectId || '';
+    DOM.cloudAuthDomain.value = config.authDomain || '';
+    DOM.cloudMessagingId.value = config.messagingSenderId || '';
+    DOM.cloudAppId.value = config.appId || '';
+    
+    const success = window.firebaseSync.init(config);
+    if (success) {
+      window.firebaseSync.onAuthStateChanged(handleAuthStateChanged);
+      updateCloudStatus('local-auth-required');
+    } else {
       updateCloudStatus('error');
     }
   } else {
