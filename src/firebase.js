@@ -82,6 +82,15 @@ class ZenFlowFirebase {
   }
 
   /**
+   * Sign In with Google Popup
+   */
+  signInWithGoogle() {
+    if (!this.auth) return Promise.reject(new Error('Firebase Auth is not initialized'));
+    const provider = new firebase.auth.GoogleAuthProvider();
+    return this.auth.signInWithPopup(provider);
+  }
+
+  /**
    * Push single item to Firestore
    * Path: users/{uid}/{storeName}/{itemId}
    */

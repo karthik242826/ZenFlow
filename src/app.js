@@ -1423,15 +1423,20 @@ function setupEventListeners() {
         showToast('Signed in successfully!');
       } catch (err) {
         console.error(err);
-        if (err.code === 'auth/user-not-found') {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
           try {
-            showToast('User not found. Auto-registering account...', 'info');
+            showToast('Authenticating/Registering account...', 'info');
             await window.firebaseSync.signUp(email, password);
             showToast('Account auto-created and signed in!');
           } catch (signUpErr) {
             console.error(signUpErr);
-            updateCloudStatus('error');
-            showToast(signUpErr.message, 'error');
+            if (signUpErr.code === 'auth/email-already-in-use') {
+              updateCloudStatus('error');
+              showToast(err.message, 'error');
+            } else {
+              updateCloudStatus('error');
+              showToast(signUpErr.message, 'error');
+            }
           }
         } else {
           updateCloudStatus('error');
@@ -1477,6 +1482,26 @@ function setupEventListeners() {
         } catch (err) {
           console.error(err);
           showToast('Sign out failed.', 'error');
+        }
+      }
+    });
+  }
+
+  // Google Sign-In button
+  const btnCloudGoogle = document.getElementById('btn-cloud-google');
+  if (btnCloudGoogle) {
+    btnCloudGoogle.addEventListener('click', async () => {
+      try {
+        updateCloudStatus('syncing');
+        await window.firebaseSync.signInWithGoogle();
+        showToast('Signed in with Google!');
+      } catch (err) {
+        console.error(err);
+        if (err.code !== 'auth/popup-closed-by-user') {
+          updateCloudStatus('error');
+          showToast(err.message, 'error');
+        } else {
+          updateCloudStatus('local-auth-required');
         }
       }
     });
