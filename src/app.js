@@ -314,22 +314,29 @@ function setupSplashListeners() {
   const btnSidebarSignout = document.getElementById('btn-sidebar-signout');
   if (btnSidebarSignout) {
     btnSidebarSignout.addEventListener('click', async () => {
-      if (confirm('Sign out of your cloud workspace? Local data will be preserved.')) {
-        try {
+      try {
+        // Sign out from Firebase if initialized
+        if (window.firebaseSync && window.firebaseSync.auth) {
           await window.firebaseSync.signOut();
-          showToast('Signed out successfully.');
-          // Show splash again for next sign-in
-          const splash = document.getElementById('login-splash');
-          const mainApp = document.getElementById('main-app');
-          if (splash) {
-            splash.style.opacity = '1';
-            splash.style.transform = 'scale(1)';
-            splash.style.display = 'flex';
-          }
-          if (mainApp) mainApp.style.display = 'none';
-        } catch (err) {
-          showToast('Sign out failed.', 'error');
         }
+        showToast('Signed out successfully.');
+      } catch (err) {
+        console.error('Sign out error:', err);
+        // Still redirect to splash even if signOut() errors
+      } finally {
+        // Always show splash login screen after sign-out attempt
+        const splash = document.getElementById('login-splash');
+        const mainApp = document.getElementById('main-app');
+        if (splash) {
+          splash.style.transition = 'none';
+          splash.style.opacity = '1';
+          splash.style.transform = 'scale(1)';
+          splash.style.display = 'flex';
+        }
+        if (mainApp) mainApp.style.display = 'none';
+        // Reset splash form fields
+        setSplashLoading(false);
+        hideSplashError();
       }
     });
   }
