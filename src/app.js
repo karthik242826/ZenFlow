@@ -1825,6 +1825,11 @@ function handleAuthStateChanged(user) {
   const sidebarEmailDisp = document.getElementById('sidebar-user-email-display');
 
   if (user) {
+    // ── SIGN-IN ──────────────────────────────────────────────────────────
+    // Switch the local IndexedDB to this user's own scoped database so
+    // their data is fully isolated from other users on the same device.
+    db.setUser(user.uid);
+
     // Update cloud modal state
     if (DOM.cloudAuthSignedOut) DOM.cloudAuthSignedOut.style.display = 'none';
     if (DOM.cloudAuthSignedIn)  DOM.cloudAuthSignedIn.style.display  = 'block';
@@ -1846,10 +1851,20 @@ function handleAuthStateChanged(user) {
     setSplashLoading(false);
     showToast(`Welcome, ${user.displayName || user.email}! 🎉`);
 
+    // Pull this user's cloud data into their scoped local DB
     syncAllFromCloud().catch(err => {
       console.error('Sync failed:', err);
     });
   } else {
+    // ── SIGN-OUT ─────────────────────────────────────────────────────────
+    // Reset the local DB back to the anonymous store and wipe in-memory
+    // state so the next user (or the login screen) starts completely fresh.
+    db.setUser(null);
+    state.timetable = [];
+    state.todos     = [];
+    state.notes     = [];
+    state.history   = [];
+
     // Update cloud modal state
     if (DOM.cloudAuthSignedOut) DOM.cloudAuthSignedOut.style.display = 'block';
     if (DOM.cloudAuthSignedIn)  DOM.cloudAuthSignedIn.style.display  = 'none';

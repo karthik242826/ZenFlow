@@ -9,6 +9,20 @@ class ZenFlowDB {
   }
 
   /**
+   * Re-initialize the DB with a user-scoped name.
+   * Closes any existing connection first so the next call to init()
+   * opens the correct per-user database.
+   * @param {string|null} uid - Firebase user UID, or null to reset to anonymous store.
+   */
+  setUser(uid) {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+    this.dbName = uid ? `ZenFlowDB_${uid}` : 'ZenFlowDB';
+  }
+
+  /**
    * Initializes the IndexedDB database
    * @returns {Promise<IDBDatabase>}
    */

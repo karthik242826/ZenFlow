@@ -316,14 +316,23 @@
     <!-- Hidden File Input for database restore -->
     <input type="file" id="db-file-input" accept=".json" style="display: none;">
 
+    <!-- Mobile Sidebar Overlay Backdrop -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
     <!-- 2. MAIN HUB CONTENT -->
     <main class="main-content">
       
       <!-- HEADER BAR -->
       <header class="header-bar">
-        <div class="header-greeting">
-          <h1 id="greeting-text">Hello there,</h1>
-          <p id="greeting-subtitle">Your productivity hub is ready.</p>
+        <div class="header-left">
+          <!-- Hamburger toggle for mobile -->
+          <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle navigation" title="Toggle sidebar">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <div class="header-greeting">
+            <h1 id="greeting-text">Hello there,</h1>
+            <p id="greeting-subtitle">Your productivity hub is ready.</p>
+          </div>
         </div>
 
         <div class="header-controls">
@@ -331,7 +340,7 @@
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="text" id="global-search" class="search-input" placeholder="Search events, tasks, notes...">
           </div>
-          <div class="datetime-display">
+          <div class="datetime-display" id="datetime-display">
             <span class="time-val" id="clock-time">00:00:00</span>
             <span class="date-val" id="clock-date">Saturday, June 20</span>
           </div>
