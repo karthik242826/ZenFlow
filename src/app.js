@@ -293,6 +293,46 @@ function setupSplashListeners() {
       showToast('Running in local mode — data stays on this device.', 'info');
     });
   }
+
+  // Sidebar Sign In button → show splash again
+  const btnSidebarSignin = document.getElementById('btn-sidebar-signin');
+  if (btnSidebarSignin) {
+    btnSidebarSignin.addEventListener('click', () => {
+      const splash = document.getElementById('login-splash');
+      const mainApp = document.getElementById('main-app');
+      if (splash) {
+        splash.style.transition = 'opacity 0.4s ease';
+        splash.style.opacity = '1';
+        splash.style.transform = 'scale(1)';
+        splash.style.display = 'flex';
+      }
+      if (mainApp) mainApp.style.display = 'none';
+    });
+  }
+
+  // Sidebar Sign Out button
+  const btnSidebarSignout = document.getElementById('btn-sidebar-signout');
+  if (btnSidebarSignout) {
+    btnSidebarSignout.addEventListener('click', async () => {
+      if (confirm('Sign out of your cloud workspace? Local data will be preserved.')) {
+        try {
+          await window.firebaseSync.signOut();
+          showToast('Signed out successfully.');
+          // Show splash again for next sign-in
+          const splash = document.getElementById('login-splash');
+          const mainApp = document.getElementById('main-app');
+          if (splash) {
+            splash.style.opacity = '1';
+            splash.style.transform = 'scale(1)';
+            splash.style.display = 'flex';
+          }
+          if (mainApp) mainApp.style.display = 'none';
+        } catch (err) {
+          showToast('Sign out failed.', 'error');
+        }
+      }
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1771,26 +1811,47 @@ function initFirebaseSync() {
 }
 
 function handleAuthStateChanged(user) {
+  const sidebarSignedIn  = document.getElementById('sidebar-user-signed-in');
+  const sidebarSignedOut = document.getElementById('sidebar-user-signed-out');
+  const sidebarAvatar    = document.getElementById('sidebar-user-avatar');
+  const sidebarName      = document.getElementById('sidebar-user-name');
+  const sidebarEmailDisp = document.getElementById('sidebar-user-email-display');
+
   if (user) {
-    DOM.cloudAuthSignedOut.style.display = 'none';
-    DOM.cloudAuthSignedIn.style.display = 'block';
-    DOM.cloudUserEmail.innerText = user.email || user.displayName || '';
-    
+    // Update cloud modal state
+    if (DOM.cloudAuthSignedOut) DOM.cloudAuthSignedOut.style.display = 'none';
+    if (DOM.cloudAuthSignedIn)  DOM.cloudAuthSignedIn.style.display  = 'block';
+    if (DOM.cloudUserEmail)     DOM.cloudUserEmail.innerText = user.email || user.displayName || '';
+
+    // Update sidebar account widget
+    if (sidebarSignedIn)  sidebarSignedIn.style.display  = 'block';
+    if (sidebarSignedOut) sidebarSignedOut.style.display = 'none';
+    const displayName = user.displayName || user.email || 'User';
+    const initial = displayName.charAt(0).toUpperCase();
+    if (sidebarAvatar)    sidebarAvatar.textContent    = initial;
+    if (sidebarName)      sidebarName.textContent      = displayName;
+    if (sidebarEmailDisp) sidebarEmailDisp.textContent = user.email || '';
+
     updateCloudStatus('connected');
-    
+
     // Dismiss splash and enter the main app
     enterApp();
     setSplashLoading(false);
     showToast(`Welcome, ${user.displayName || user.email}! 🎉`);
-    
+
     syncAllFromCloud().catch(err => {
       console.error('Sync failed:', err);
     });
   } else {
-    DOM.cloudAuthSignedOut.style.display = 'block';
-    DOM.cloudAuthSignedIn.style.display = 'none';
-    DOM.cloudUserEmail.innerText = '';
-    
+    // Update cloud modal state
+    if (DOM.cloudAuthSignedOut) DOM.cloudAuthSignedOut.style.display = 'block';
+    if (DOM.cloudAuthSignedIn)  DOM.cloudAuthSignedIn.style.display  = 'none';
+    if (DOM.cloudUserEmail)     DOM.cloudUserEmail.innerText = '';
+
+    // Update sidebar account widget
+    if (sidebarSignedIn)  sidebarSignedIn.style.display  = 'none';
+    if (sidebarSignedOut) sidebarSignedOut.style.display = 'block';
+
     updateCloudStatus('local-auth-required');
   }
 }
