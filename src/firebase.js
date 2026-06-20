@@ -98,38 +98,44 @@ class ZenFlowFirebase {
     if (!this.db || !this.currentUser) return;
     
     const uid = this.currentUser.uid;
-    const itemId = String(item.id);
+    // Use the stable cloudId UUID as the Firestore doc key so the same item
+    // maps to the same document on every device. Fall back to stringified
+    // local id only for legacy items that pre-date this change.
+    const docId = item.cloudId || String(item.id);
     
     try {
       await this.db
         .collection('users')
         .doc(uid)
         .collection(storeName)
-        .doc(itemId)
+        .doc(docId)
         .set(item);
     } catch (error) {
-      console.error(`Firebase: Failed to push to ${storeName}/${itemId}:`, error);
+      console.error(`Firebase: Failed to push to ${storeName}/${docId}:`, error);
     }
   }
 
   /**
-   * Delete single item from Firestore
+   * Delete single item from Firestore.
+   * @param {string} storeName
+   * @param {Object} item - the full item object (needs cloudId or id)
    */
-  async deleteFromCloud(storeName, id) {
+  async deleteFromCloud(storeName, item) {
     if (!this.db || !this.currentUser) return;
     
     const uid = this.currentUser.uid;
-    const itemId = String(id);
+    // Resolve the Firestore document ID the same way pushToCloud does.
+    const docId = (item && item.cloudId) ? item.cloudId : String(item && item.id !== undefined ? item.id : item);
     
     try {
       await this.db
         .collection('users')
         .doc(uid)
         .collection(storeName)
-        .doc(itemId)
+        .doc(docId)
         .delete();
     } catch (error) {
-      console.error(`Firebase: Failed to delete from ${storeName}/${itemId}:`, error);
+      console.error(`Firebase: Failed to delete from ${storeName}/${docId}:`, error);
     }
   }
 

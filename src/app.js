@@ -784,7 +784,7 @@ function renderTimetable() {
           if (confirm('Delete this event from your schedule?')) {
             await db.delete('timetable', event.id);
             if (window.firebaseSync && window.firebaseSync.currentUser) {
-              await window.firebaseSync.deleteFromCloud('timetable', event.id);
+              await window.firebaseSync.deleteFromCloud('timetable', event);
             }
             await logHistory('deleted', 'timetable', event.title);
             await reloadData();
@@ -962,7 +962,7 @@ function createTaskRowElement(task) {
     if (confirm('Delete this task?')) {
       await db.delete('todos', task.id);
       if (window.firebaseSync && window.firebaseSync.currentUser) {
-        await window.firebaseSync.deleteFromCloud('todos', task.id);
+        await window.firebaseSync.deleteFromCloud('todos', task);
       }
       await logHistory('deleted', 'todo', task.title);
       await reloadData();
@@ -1080,7 +1080,7 @@ function createNoteCardElement(note) {
     if (confirm('Permanently delete this note?')) {
       await db.delete('notes', note.id);
       if (window.firebaseSync && window.firebaseSync.currentUser) {
-        await window.firebaseSync.deleteFromCloud('notes', note.id);
+        await window.firebaseSync.deleteFromCloud('notes', note);
       }
       await logHistory('deleted', 'notes', note.title);
       await reloadData();
@@ -1183,18 +1183,21 @@ function handleNoteInput() {
     };
     
     if (noteId) {
-      // Edit mode: fetch original node's pin status
+      // Edit mode: fetch original note's pin status and cloudId
       const existing = state.notes.find(n => n.id === Number(noteId));
       noteData.id = Number(noteId);
       noteData.pinned = existing ? existing.pinned : false;
+      // Preserve the cloudId so Firestore overwrites the same document
+      if (existing && existing.cloudId) noteData.cloudId = existing.cloudId;
       
       await db.update('notes', noteData);
       if (window.firebaseSync && window.firebaseSync.currentUser) {
         await window.firebaseSync.pushToCloud('notes', noteData);
       }
     } else {
-      // New note creation
+      // New note creation — assign a stable UUID for cross-device sync
       noteData.pinned = false;
+      noteData.cloudId = crypto.randomUUID();
       const newId = await db.add('notes', noteData);
       DOM.noteId.value = newId;
       noteData.id = newId;
@@ -1217,11 +1220,44 @@ function handleNoteInput() {
    ========================================================================== */
 function setupEventListeners() {
   
-  // 1. Sidebar Nav Views toggles
+  // 0. Mobile sidebar hamburger toggle
+  const sidebarToggleBtn = document.getElementById('sidebar-toggle');
+  const sidebarBackdrop  = document.getElementById('sidebar-backdrop');
+  const sidebarEl        = document.querySelector('.sidebar');
+
+  function openMobileSidebar() {
+    sidebarEl.classList.add('open');
+    sidebarBackdrop.classList.add('active');
+    document.body.style.overflow = 'hidden'; // Prevent background scroll
+  }
+
+  function closeMobileSidebar() {
+    sidebarEl.classList.remove('open');
+    sidebarBackdrop.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.addEventListener('click', () => {
+      if (sidebarEl.classList.contains('open')) {
+        closeMobileSidebar();
+      } else {
+        openMobileSidebar();
+      }
+    });
+  }
+
+  if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener('click', closeMobileSidebar);
+  }
+
+  // 1. Sidebar Nav Views toggles — also close drawer on mobile
   DOM.navItems.forEach(item => {
     item.addEventListener('click', () => {
       const targetView = item.getAttribute('data-view');
       switchView(targetView);
+      // Close mobile sidebar drawer after navigating
+      if (window.innerWidth <= 768) closeMobileSidebar();
     });
   });
   
@@ -1301,6 +1337,8 @@ function setupEventListeners() {
         showToast('Event updated successfully');
         await logHistory('updated', 'timetable', title);
       } else {
+        // Assign a stable cross-device UUID before saving
+        eventData.cloudId = crypto.randomUUID();
         const newId = await db.add('timetable', eventData);
         eventData.id = newId;
         if (window.firebaseSync && window.firebaseSync.currentUser) {
@@ -1335,7 +1373,8 @@ function setupEventListeners() {
       priority,
       dueDate: dueDate || null,
       category,
-      completed: false
+      completed: false,
+      cloudId: crypto.randomUUID() // Stable UUID so same item maps to same Firestore doc on every device
     };
     
     try {
@@ -1417,7 +1456,7 @@ function setupEventListeners() {
       const note = state.notes.find(n => n.id === Number(noteId));
       await db.delete('notes', Number(noteId));
       if (window.firebaseSync && window.firebaseSync.currentUser) {
-        await window.firebaseSync.deleteFromCloud('notes', Number(noteId));
+        await window.firebaseSync.deleteFromCloud('notes', note || { id: Number(noteId) });
       }
       await logHistory('deleted', 'notes', note ? note.title : 'Untitled Note');
       await reloadData();
@@ -1720,14 +1759,16 @@ async function syncAllFromCloud() {
       if (cloudItems.length > 0) {
         await db.clearStore(store);
         for (const item of cloudItems) {
-          if (item.id !== undefined) {
-            item.id = Number(item.id);
-          }
+          // Remove the local auto-increment id so IndexedDB assigns a fresh
+          // one for this device. The cloudId UUID is preserved and will be
+          // used for all future Firestore operations.
+          delete item.id;
           await db.add(store, item);
         }
         anyPulled = true;
       } else {
-        // Cloud is empty, push local state to cloud
+        // Cloud is empty for this store — upload local data to initialise it
+        await reloadData(); // ensure state is fresh from the user-scoped DB
         for (const item of state[store]) {
           await window.firebaseSync.pushToCloud(store, item);
         }
