@@ -11,7 +11,168 @@
 </head>
 <body>
 
-  <div class="app-container">
+  <!-- =====================================================
+       LOGIN SPLASH SCREEN (shown before app loads)
+       ===================================================== -->
+  <div id="login-splash" style="
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 60% 30%, #1a0533 0%, #0a0a1a 60%, #000 100%);
+    font-family: 'Inter', system-ui, sans-serif;
+  ">
+    <!-- Animated background blobs -->
+    <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none;">
+      <div style="position:absolute;top:-10%;left:20%;width:500px;height:500px;background:radial-gradient(circle,rgba(139,92,246,0.18) 0%,transparent 70%);border-radius:50%;animation:blobPulse 6s ease-in-out infinite;"></div>
+      <div style="position:absolute;bottom:-10%;right:15%;width:400px;height:400px;background:radial-gradient(circle,rgba(99,102,241,0.14) 0%,transparent 70%);border-radius:50%;animation:blobPulse 8s ease-in-out infinite reverse;"></div>
+      <div style="position:absolute;top:30%;right:5%;width:300px;height:300px;background:radial-gradient(circle,rgba(168,85,247,0.1) 0%,transparent 70%);border-radius:50%;animation:blobPulse 10s ease-in-out infinite;"></div>
+    </div>
+
+    <div style="
+      width: 100%;
+      max-width: 420px;
+      padding: 2.5rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(139,92,246,0.15);
+      position: relative;
+      z-index: 1;
+      animation: splashFadeIn 0.6s ease-out;
+    ">
+      <!-- Logo + Brand -->
+      <div style="text-align:center;margin-bottom:2rem;">
+        <div style="
+          width:64px;height:64px;
+          background:linear-gradient(135deg,#8b5cf6,#6366f1);
+          border-radius:18px;
+          display:inline-flex;align-items:center;justify-content:center;
+          font-size:1.8rem;color:white;
+          box-shadow:0 8px 32px rgba(139,92,246,0.4);
+          margin-bottom:1rem;
+        ">
+          <i class="fa-solid fa-wind"></i>
+        </div>
+        <h1 style="font-size:2rem;font-weight:800;color:#fff;margin:0 0 0.3rem;">ZenFlow</h1>
+        <p style="color:rgba(255,255,255,0.45);font-size:0.9rem;margin:0;">Your personal productivity hub</p>
+      </div>
+
+      <!-- Error message placeholder -->
+      <div id="login-error" style="
+        display:none;
+        background:rgba(255,71,87,0.12);
+        border:1px solid rgba(255,71,87,0.3);
+        border-radius:10px;
+        padding:0.75rem 1rem;
+        font-size:0.85rem;
+        color:#ff6b7a;
+        margin-bottom:1rem;
+        text-align:center;
+      "></div>
+
+      <!-- Google Sign-In -->
+      <button id="splash-google-btn" style="
+        width:100%;
+        display:flex;align-items:center;justify-content:center;gap:0.75rem;
+        padding:0.85rem 1rem;
+        background:rgba(255,255,255,0.08);
+        border:1px solid rgba(255,255,255,0.15);
+        border-radius:12px;
+        color:#fff;
+        font-size:0.95rem;font-weight:600;
+        cursor:pointer;
+        transition:all 0.2s;
+        margin-bottom:1.25rem;
+        letter-spacing:0.01em;
+      " onmouseover="this.style.background='rgba(255,255,255,0.14)';this.style.borderColor='rgba(139,92,246,0.5)'" onmouseout="this.style.background='rgba(255,255,255,0.08)';this.style.borderColor='rgba(255,255,255,0.15)'">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+
+      <!-- Divider -->
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;">
+        <div style="flex:1;height:1px;background:rgba(255,255,255,0.1);"></div>
+        <span style="font-size:0.75rem;color:rgba(255,255,255,0.3);">or continue with email</span>
+        <div style="flex:1;height:1px;background:rgba(255,255,255,0.1);"></div>
+      </div>
+
+      <!-- Email/Password Form -->
+      <form id="splash-login-form">
+        <div style="margin-bottom:0.85rem;">
+          <input type="email" id="splash-email" placeholder="Email address" value="demo@zenflow.com" style="
+            width:100%;box-sizing:border-box;
+            padding:0.8rem 1rem;
+            background:rgba(255,255,255,0.06);
+            border:1px solid rgba(255,255,255,0.12);
+            border-radius:10px;
+            color:#fff;font-size:0.9rem;
+            outline:none;transition:border-color 0.2s;
+          " onfocus="this.style.borderColor='rgba(139,92,246,0.6)'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'">
+        </div>
+        <div style="margin-bottom:1.25rem;">
+          <input type="password" id="splash-password" placeholder="Password" value="zenflow123" style="
+            width:100%;box-sizing:border-box;
+            padding:0.8rem 1rem;
+            background:rgba(255,255,255,0.06);
+            border:1px solid rgba(255,255,255,0.12);
+            border-radius:10px;
+            color:#fff;font-size:0.9rem;
+            outline:none;transition:border-color 0.2s;
+          " onfocus="this.style.borderColor='rgba(139,92,246,0.6)'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'">
+        </div>
+        <button type="submit" id="splash-signin-btn" style="
+          width:100%;
+          padding:0.85rem;
+          background:linear-gradient(135deg,#8b5cf6,#6366f1);
+          border:none;border-radius:12px;
+          color:#fff;font-size:0.95rem;font-weight:700;
+          cursor:pointer;
+          transition:opacity 0.2s, transform 0.1s;
+          letter-spacing:0.01em;
+          box-shadow:0 4px 20px rgba(139,92,246,0.4);
+          margin-bottom:0.75rem;
+        " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+          Sign In
+        </button>
+        <button type="button" id="splash-register-btn" style="
+          width:100%;
+          padding:0.75rem;
+          background:transparent;
+          border:1px solid rgba(255,255,255,0.12);
+          border-radius:12px;
+          color:rgba(255,255,255,0.6);font-size:0.88rem;
+          cursor:pointer;
+          transition:all 0.2s;
+        " onmouseover="this.style.borderColor='rgba(139,92,246,0.4)';this.style.color='#fff'" onmouseout="this.style.borderColor='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.6)'">
+          Create Account
+        </button>
+      </form>
+
+      <!-- Skip link -->
+      <p style="text-align:center;margin-top:1.25rem;margin-bottom:0;">
+        <button id="splash-skip-btn" style="background:none;border:none;color:rgba(255,255,255,0.3);font-size:0.8rem;cursor:pointer;text-decoration:underline;" onmouseover="this.style.color='rgba(255,255,255,0.6)'" onmouseout="this.style.color='rgba(255,255,255,0.3)'">
+          Skip for now (local mode)
+        </button>
+      </p>
+    </div>
+
+    <style>
+      @keyframes splashFadeIn {
+        from { opacity:0; transform:translateY(20px) scale(0.97); }
+        to   { opacity:1; transform:translateY(0) scale(1); }
+      }
+      @keyframes blobPulse {
+        0%,100% { transform:scale(1) translate(0,0); }
+        50%     { transform:scale(1.1) translate(20px,-20px); }
+      }
+    </style>
+  </div>
+
+  <div class="app-container" id="main-app" style="display:none;">
     
     <!-- 1. SIDEBAR -->
     <aside class="sidebar">

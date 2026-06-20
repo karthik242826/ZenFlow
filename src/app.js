@@ -173,6 +173,128 @@ function showToast(message, type = 'success') {
 /* ==========================================================================
    APP INITIALIZATION & DATA LOADING
    ========================================================================== */
+/* ==========================================================================
+   SPLASH / LOGIN SCREEN CONTROLLER
+   ========================================================================== */
+function showSplashError(msg) {
+  const el = document.getElementById('login-error');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function hideSplashError() {
+  const el = document.getElementById('login-error');
+  if (el) el.style.display = 'none';
+}
+
+function setSplashLoading(loading) {
+  const btn = document.getElementById('splash-signin-btn');
+  const gBtn = document.getElementById('splash-google-btn');
+  if (btn) btn.textContent = loading ? 'Signing in...' : 'Sign In';
+  if (btn) btn.disabled = loading;
+  if (gBtn) gBtn.disabled = loading;
+}
+
+function enterApp() {
+  const splash = document.getElementById('login-splash');
+  const mainApp = document.getElementById('main-app');
+  if (splash) {
+    splash.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    splash.style.opacity = '0';
+    splash.style.transform = 'scale(1.03)';
+    setTimeout(() => { splash.style.display = 'none'; }, 500);
+  }
+  if (mainApp) mainApp.style.display = '';
+}
+
+function setupSplashListeners() {
+  // Google sign-in
+  const splashGoogleBtn = document.getElementById('splash-google-btn');
+  if (splashGoogleBtn) {
+    splashGoogleBtn.addEventListener('click', async () => {
+      hideSplashError();
+      setSplashLoading(true);
+      try {
+        await window.firebaseSync.signInWithGoogle();
+        // handleAuthStateChanged will call enterApp
+      } catch (err) {
+        setSplashLoading(false);
+        if (err.code !== 'auth/popup-closed-by-user') {
+          showSplashError(err.message || 'Google sign-in failed.');
+        }
+      }
+    });
+  }
+
+  // Email/password sign in
+  const splashForm = document.getElementById('splash-login-form');
+  if (splashForm) {
+    splashForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideSplashError();
+      const email = document.getElementById('splash-email').value.trim();
+      const password = document.getElementById('splash-password').value;
+      if (!email || !password) {
+        showSplashError('Please enter your email and password.');
+        return;
+      }
+      setSplashLoading(true);
+      try {
+        await window.firebaseSync.signIn(email, password);
+        // handleAuthStateChanged will call enterApp
+      } catch (err) {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+          try {
+            await window.firebaseSync.signUp(email, password);
+          } catch (signUpErr) {
+            setSplashLoading(false);
+            showSplashError(signUpErr.message || 'Registration failed.');
+          }
+        } else {
+          setSplashLoading(false);
+          showSplashError(err.message || 'Sign in failed.');
+        }
+      }
+    });
+  }
+
+  // Create account button
+  const splashRegisterBtn = document.getElementById('splash-register-btn');
+  if (splashRegisterBtn) {
+    splashRegisterBtn.addEventListener('click', async () => {
+      hideSplashError();
+      const email = document.getElementById('splash-email').value.trim();
+      const password = document.getElementById('splash-password').value;
+      if (!email || !password) {
+        showSplashError('Please enter an email and password to register.');
+        return;
+      }
+      if (password.length < 6) {
+        showSplashError('Password must be at least 6 characters.');
+        return;
+      }
+      setSplashLoading(true);
+      try {
+        await window.firebaseSync.signUp(email, password);
+        // handleAuthStateChanged will call enterApp
+      } catch (err) {
+        setSplashLoading(false);
+        showSplashError(err.message || 'Registration failed.');
+      }
+    });
+  }
+
+  // Skip button → local mode
+  const splashSkipBtn = document.getElementById('splash-skip-btn');
+  if (splashSkipBtn) {
+    splashSkipBtn.addEventListener('click', () => {
+      enterApp();
+      showToast('Running in local mode — data stays on this device.', 'info');
+    });
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     // 1. Initialize IndexedDB
@@ -193,11 +315,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 5b. Initialize Firebase Sync Configuration
     initFirebaseSync();
+
+    // 5c. Setup splash screen listeners
+    setupSplashListeners();
     
     // 6. Draw UI views
     renderAll();
     
-    showToast('Workspace loaded successfully!');
   } catch (error) {
     console.error('Failed to initialize app:', error);
     showToast('Database failed to initialize.', 'error');
@@ -1642,9 +1766,14 @@ function handleAuthStateChanged(user) {
   if (user) {
     DOM.cloudAuthSignedOut.style.display = 'none';
     DOM.cloudAuthSignedIn.style.display = 'block';
-    DOM.cloudUserEmail.innerText = user.email;
+    DOM.cloudUserEmail.innerText = user.email || user.displayName || '';
     
     updateCloudStatus('connected');
+    
+    // Dismiss splash and enter the main app
+    enterApp();
+    setSplashLoading(false);
+    showToast(`Welcome, ${user.displayName || user.email}! 🎉`);
     
     syncAllFromCloud().catch(err => {
       console.error('Sync failed:', err);
