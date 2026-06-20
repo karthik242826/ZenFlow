@@ -379,35 +379,43 @@ function momentDayName(dayIndex) {
    CLOCK & TIME SERVICES
    ========================================================================== */
 function startClock() {
+  const IST = 'Asia/Kolkata';
+
   const updateTime = () => {
     const now = new Date();
-    
-    // Clock string
-    let hours = now.getHours();
-    let minutes = now.getMinutes();
-    let seconds = now.getSeconds();
-    
-    hours = hours < 10 ? '0' + hours : hours;
-    minutes = minutes < 10 ? '0' + minutes : minutes;
-    seconds = seconds < 10 ? '0' + seconds : seconds;
-    
-    DOM.clockTime.innerText = `${hours}:${minutes}:${seconds}`;
-    
-    // Date string
-    const options = { weekday: 'long', month: 'long', day: 'numeric' };
-    DOM.clockDate.innerText = now.toLocaleDateString('en-US', options);
-    
-    // Greeting
-    const hourNum = now.getHours();
-    if (hourNum < 12) {
+
+    // 12-hour time in IST
+    const timeStr = now.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+      timeZone: IST
+    });
+    DOM.clockTime.innerText = timeStr.toUpperCase(); // e.g. "11:45:30 PM"
+
+    // Date in IST
+    const dateStr = now.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      timeZone: IST
+    });
+    DOM.clockDate.innerText = dateStr;
+
+    // Greeting based on IST hour
+    const istHour = parseInt(
+      now.toLocaleString('en-IN', { hour: 'numeric', hour12: false, timeZone: IST })
+    );
+    if (istHour < 12) {
       DOM.greetingText.innerText = 'Good Morning,';
-    } else if (hourNum < 18) {
+    } else if (istHour < 18) {
       DOM.greetingText.innerText = 'Good Afternoon,';
     } else {
       DOM.greetingText.innerText = 'Good Evening,';
     }
   };
-  
+
   updateTime();
   setInterval(updateTime, 1000);
 }
