@@ -189,6 +189,118 @@ class ZenFlowFirebase {
       console.error(`Firebase: Failed to clear cloud store ${storeName}:`, error);
     }
   }
+
+  /**
+   * Start real-time sync for all stores
+   * @param {Function} onSyncComplete - Callback when database changes and UI needs reload/render
+   */
+  startSync(onSyncComplete) {
+    if (!this.db || !this.currentUser) return;
+    this.stopSync();
+    
+    const uid = this.currentUser.uid;
+    const stores = ['timetable', 'todos', 'notes', 'history'];
+    this.syncUnsubscribes = [];
+    
+    stores.forEach(storeName => {
+      let isInitial = true;
+      const unsub = this.db
+        .collection('users')
+        .doc(uid)
+        .collection(storeName)
+        .onSnapshot(async (snapshot) => {
+          try {
+            // Get all cloud items
+            const cloudItems = [];
+            snapshot.forEach(doc => {
+              cloudItems.push(doc.data());
+            });
+            
+            // Get all local items
+            const localItems = await window.db.getAll(storeName);
+            
+            // Map local items by cloudId for fast lookup
+            const localMap = new Map();
+            localItems.forEach(item => {
+              if (item.cloudId) {
+                localMap.set(item.cloudId, item);
+              }
+            });
+            
+            let hasChanges = false;
+            const cloudIds = new Set();
+            
+            // 1. Process items from cloud snapshot (add or update locally)
+            for (const cloudItem of cloudItems) {
+              const cloudId = cloudItem.cloudId;
+              if (!cloudId) continue;
+              cloudIds.add(cloudId);
+              
+              const localItem = localMap.get(cloudId);
+              if (localItem) {
+                // Check if they are actually different before updating
+                const updatedItem = { ...cloudItem, id: localItem.id };
+                if (JSON.stringify(localItem) !== JSON.stringify(updatedItem)) {
+                  await window.db.update(storeName, updatedItem);
+                  hasChanges = true;
+                }
+              } else {
+                // Add new item to IndexedDB
+                const newItem = { ...cloudItem };
+                delete newItem.id; // Let IndexedDB assign new ID
+                await window.db.add(storeName, newItem);
+                hasChanges = true;
+              }
+            }
+            
+            // 2. Remove local items that are not in the cloud snapshot
+            // Note: We only delete if they have a cloudId (to avoid deleting legacy items that don't have one yet)
+            for (const localItem of localItems) {
+              if (localItem.cloudId && !cloudIds.has(localItem.cloudId)) {
+                await window.db.delete(storeName, localItem.id);
+                hasChanges = true;
+              }
+            }
+            
+            // 3. For the initial load, if the cloud is completely empty for this store,
+            // we should upload the local items that are currently in IndexedDB.
+            if (isInitial && snapshot.empty && localItems.length > 0) {
+              for (const item of localItems) {
+                await this.pushToCloud(storeName, item);
+              }
+            }
+            
+            isInitial = false;
+            
+            if (hasChanges && onSyncComplete) {
+              onSyncComplete();
+            }
+          } catch (err) {
+            console.error(`Firebase Sync: Error processing update for ${storeName}:`, err);
+          }
+        }, error => {
+          console.error(`Firebase Sync: error for ${storeName}:`, error);
+        });
+        
+      this.syncUnsubscribes.push(unsub);
+    });
+  }
+
+  /**
+   * Stop real-time sync and unsubscribe
+   */
+  stopSync() {
+    if (this.syncUnsubscribes && this.syncUnsubscribes.length > 0) {
+      this.syncUnsubscribes.forEach(unsub => {
+        try {
+          unsub();
+        } catch (e) {
+          console.error('Firebase Sync: error during unsubscribe:', e);
+        }
+      });
+      this.syncUnsubscribes = [];
+    }
+  }
 }
 
 // Export singleton instance globally

@@ -244,17 +244,8 @@ function setupSplashListeners() {
         await window.firebaseSync.signIn(email, password);
         // handleAuthStateChanged will call enterApp
       } catch (err) {
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-          try {
-            await window.firebaseSync.signUp(email, password);
-          } catch (signUpErr) {
-            setSplashLoading(false);
-            showSplashError(signUpErr.message || 'Registration failed.');
-          }
-        } else {
-          setSplashLoading(false);
-          showSplashError(err.message || 'Sign in failed.');
-        }
+        setSplashLoading(false);
+        showSplashError(err.message || 'Sign in failed.');
       }
     });
   }
@@ -383,6 +374,25 @@ async function reloadData() {
   state.todos = await db.getAll('todos');
   state.notes = await db.getAll('notes');
   state.history = await db.getAll('history');
+
+  let updatedAny = false;
+  const stores = ['timetable', 'todos', 'notes', 'history'];
+  for (const store of stores) {
+    for (const item of state[store]) {
+      if (!item.cloudId) {
+        item.cloudId = crypto.randomUUID();
+        await db.update(store, item);
+        updatedAny = true;
+      }
+    }
+  }
+
+  if (updatedAny) {
+    state.timetable = await db.getAll('timetable');
+    state.todos = await db.getAll('todos');
+    state.notes = await db.getAll('notes');
+    state.history = await db.getAll('history');
+  }
 }
 
 /**
@@ -784,7 +794,7 @@ function renderTimetable() {
           if (confirm('Delete this event from your schedule?')) {
             await db.delete('timetable', event.id);
             if (window.firebaseSync && window.firebaseSync.currentUser) {
-              await window.firebaseSync.deleteFromCloud('timetable', event);
+              window.firebaseSync.deleteFromCloud('timetable', event);
             }
             await logHistory('deleted', 'timetable', event.title);
             await reloadData();
@@ -944,7 +954,7 @@ function createTaskRowElement(task) {
     task.completed = !task.completed;
     await db.update('todos', task);
     if (window.firebaseSync && window.firebaseSync.currentUser) {
-      await window.firebaseSync.pushToCloud('todos', task);
+      window.firebaseSync.pushToCloud('todos', task);
     }
     await logHistory(task.completed ? 'completed' : 'toggled_incomplete', 'todo', task.title);
     await reloadData();
@@ -962,7 +972,7 @@ function createTaskRowElement(task) {
     if (confirm('Delete this task?')) {
       await db.delete('todos', task.id);
       if (window.firebaseSync && window.firebaseSync.currentUser) {
-        await window.firebaseSync.deleteFromCloud('todos', task);
+        window.firebaseSync.deleteFromCloud('todos', task);
       }
       await logHistory('deleted', 'todo', task.title);
       await reloadData();
@@ -1067,7 +1077,7 @@ function createNoteCardElement(note) {
     note.updatedAt = Date.now();
     await db.update('notes', note);
     if (window.firebaseSync && window.firebaseSync.currentUser) {
-      await window.firebaseSync.pushToCloud('notes', note);
+      window.firebaseSync.pushToCloud('notes', note);
     }
     await logHistory(note.pinned ? 'pinned' : 'unpinned', 'notes', note.title);
     await reloadData();
@@ -1080,7 +1090,7 @@ function createNoteCardElement(note) {
     if (confirm('Permanently delete this note?')) {
       await db.delete('notes', note.id);
       if (window.firebaseSync && window.firebaseSync.currentUser) {
-        await window.firebaseSync.deleteFromCloud('notes', note);
+        window.firebaseSync.deleteFromCloud('notes', note);
       }
       await logHistory('deleted', 'notes', note.title);
       await reloadData();
@@ -1192,7 +1202,7 @@ function handleNoteInput() {
       
       await db.update('notes', noteData);
       if (window.firebaseSync && window.firebaseSync.currentUser) {
-        await window.firebaseSync.pushToCloud('notes', noteData);
+        window.firebaseSync.pushToCloud('notes', noteData);
       }
     } else {
       // New note creation — assign a stable UUID for cross-device sync
@@ -1205,7 +1215,7 @@ function handleNoteInput() {
       DOM.noteModalDelete.style.display = 'block';
       await logHistory('created', 'notes', noteData.title);
       if (window.firebaseSync && window.firebaseSync.currentUser) {
-        await window.firebaseSync.pushToCloud('notes', noteData);
+        window.firebaseSync.pushToCloud('notes', noteData);
       }
     }
     
@@ -1332,7 +1342,7 @@ function setupEventListeners() {
       if (id) {
         await db.update('timetable', eventData);
         if (window.firebaseSync && window.firebaseSync.currentUser) {
-          await window.firebaseSync.pushToCloud('timetable', eventData);
+          window.firebaseSync.pushToCloud('timetable', eventData);
         }
         showToast('Event updated successfully');
         await logHistory('updated', 'timetable', title);
@@ -1342,7 +1352,7 @@ function setupEventListeners() {
         const newId = await db.add('timetable', eventData);
         eventData.id = newId;
         if (window.firebaseSync && window.firebaseSync.currentUser) {
-          await window.firebaseSync.pushToCloud('timetable', eventData);
+          window.firebaseSync.pushToCloud('timetable', eventData);
         }
         showToast('Event scheduled successfully');
         await logHistory('scheduled', 'timetable', title);
@@ -1381,7 +1391,7 @@ function setupEventListeners() {
       const newId = await db.add('todos', taskData);
       taskData.id = newId;
       if (window.firebaseSync && window.firebaseSync.currentUser) {
-        await window.firebaseSync.pushToCloud('todos', taskData);
+        window.firebaseSync.pushToCloud('todos', taskData);
       }
       DOM.todoForm.reset();
       await logHistory('added', 'todo', title);
@@ -1436,7 +1446,7 @@ function setupEventListeners() {
       note.updatedAt = Date.now();
       await db.update('notes', note);
       if (window.firebaseSync && window.firebaseSync.currentUser) {
-        await window.firebaseSync.pushToCloud('notes', note);
+        window.firebaseSync.pushToCloud('notes', note);
       }
       await logHistory(note.pinned ? 'pinned' : 'unpinned', 'notes', note.title);
       await reloadData();
@@ -1456,7 +1466,7 @@ function setupEventListeners() {
       const note = state.notes.find(n => n.id === Number(noteId));
       await db.delete('notes', Number(noteId));
       if (window.firebaseSync && window.firebaseSync.currentUser) {
-        await window.firebaseSync.deleteFromCloud('notes', note || { id: Number(noteId) });
+        window.firebaseSync.deleteFromCloud('notes', note || { id: Number(noteId) });
       }
       await logHistory('deleted', 'notes', note ? note.title : 'Untitled Note');
       await reloadData();
@@ -1514,7 +1524,7 @@ function setupEventListeners() {
         
         await db.importData(data);
         if (window.firebaseSync && window.firebaseSync.currentUser) {
-          await syncLocalToCloud();
+          syncLocalToCloud();
         }
         await logHistory('imported', 'system', file.name);
         await reloadData();
@@ -1537,7 +1547,7 @@ function setupEventListeners() {
         try {
           await db.clearStore('history');
           if (window.firebaseSync && window.firebaseSync.currentUser) {
-            await window.firebaseSync.clearCloudStore('history');
+            window.firebaseSync.clearCloudStore('history');
           }
           await reloadData();
           renderHistory();
@@ -1641,25 +1651,8 @@ function setupEventListeners() {
         showToast('Signed in successfully!');
       } catch (err) {
         console.error(err);
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-          try {
-            showToast('Authenticating/Registering account...', 'info');
-            await window.firebaseSync.signUp(email, password);
-            showToast('Account auto-created and signed in!');
-          } catch (signUpErr) {
-            console.error(signUpErr);
-            if (signUpErr.code === 'auth/email-already-in-use') {
-              updateCloudStatus('error');
-              showToast(err.message, 'error');
-            } else {
-              updateCloudStatus('error');
-              showToast(signUpErr.message, 'error');
-            }
-          }
-        } else {
-          updateCloudStatus('error');
-          showToast(err.message, 'error');
-        }
+        updateCloudStatus('error');
+        showToast(err.message || 'Sign in failed.', 'error');
       }
     });
   }
@@ -1858,7 +1851,7 @@ function initFirebaseSync() {
   }
 }
 
-function handleAuthStateChanged(user) {
+async function handleAuthStateChanged(user) {
   const sidebarSignedIn  = document.getElementById('sidebar-user-signed-in');
   const sidebarSignedOut = document.getElementById('sidebar-user-signed-out');
   const sidebarAvatar    = document.getElementById('sidebar-user-avatar');
@@ -1867,9 +1860,59 @@ function handleAuthStateChanged(user) {
 
   if (user) {
     // ── SIGN-IN ──────────────────────────────────────────────────────────
+    // Export anonymous data if we are switching from anonymous to user-scoped
+    let anonymousData = null;
+    if (db.dbName === 'ZenFlowDB') {
+      try {
+        anonymousData = await db.exportData();
+      } catch (e) {
+        console.error('Failed to export anonymous data for migration:', e);
+      }
+    }
+
     // Switch the local IndexedDB to this user's own scoped database so
     // their data is fully isolated from other users on the same device.
     db.setUser(user.uid);
+
+    // If we have anonymous data, migrate it to the new user-scoped DB
+    if (anonymousData) {
+      try {
+        await db.init();
+        const stores = ['timetable', 'todos', 'notes', 'history'];
+        let hasMigrated = false;
+        
+        for (const store of stores) {
+          const items = anonymousData[store];
+          if (Array.isArray(items) && items.length > 0) {
+            for (const item of items) {
+              if (!item.cloudId) {
+                item.cloudId = crypto.randomUUID();
+              }
+              delete item.id; // Let IndexedDB assign new auto-increment ID
+              const newId = await db.add(store, item);
+              item.id = newId;
+              
+              // Push to Firestore immediately
+              window.firebaseSync.pushToCloud(store, item);
+              hasMigrated = true;
+            }
+          }
+        }
+        
+        if (hasMigrated) {
+          // Switch to anonymous DB, clear it, and switch back
+          db.setUser(null);
+          await db.init();
+          await db.clearStore('timetable');
+          await db.clearStore('todos');
+          await db.clearStore('notes');
+          await db.clearStore('history');
+          db.setUser(user.uid);
+        }
+      } catch (e) {
+        console.error('Failed to migrate anonymous data:', e);
+      }
+    }
 
     // Update cloud modal state
     if (DOM.cloudAuthSignedOut) DOM.cloudAuthSignedOut.style.display = 'none';
@@ -1892,12 +1935,18 @@ function handleAuthStateChanged(user) {
     setSplashLoading(false);
     showToast(`Welcome, ${user.displayName || user.email}! 🎉`);
 
-    // Pull this user's cloud data into their scoped local DB
-    syncAllFromCloud().catch(err => {
-      console.error('Sync failed:', err);
+    // Start real-time sync with callback to reload data and render
+    window.firebaseSync.startSync(async () => {
+      await reloadData();
+      renderAll();
     });
   } else {
     // ── SIGN-OUT ─────────────────────────────────────────────────────────
+    // Stop real-time sync
+    if (window.firebaseSync) {
+      window.firebaseSync.stopSync();
+    }
+
     // Reset the local DB back to the anonymous store and wipe in-memory
     // state so the next user (or the login screen) starts completely fresh.
     db.setUser(null);
@@ -1916,6 +1965,9 @@ function handleAuthStateChanged(user) {
     if (sidebarSignedOut) sidebarSignedOut.style.display = 'block';
 
     updateCloudStatus('local-auth-required');
+
+    // Re-render UI to show empty state
+    renderAll();
   }
 }
 
@@ -1968,7 +2020,7 @@ async function logHistory(action, category, details) {
     state.history = await db.getAll('history');
     renderHistory();
     if (window.firebaseSync && window.firebaseSync.currentUser) {
-      await window.firebaseSync.pushToCloud('history', entry);
+      window.firebaseSync.pushToCloud('history', entry);
     }
   } catch (err) {
     console.error('Failed to log history:', err);
