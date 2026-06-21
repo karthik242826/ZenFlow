@@ -270,16 +270,19 @@ class ZenFlowFirebase {
               }
             }
             
-            isInitial = false;
-            
-            if (hasChanges && onSyncComplete) {
+            if ((isInitial || hasChanges) && onSyncComplete) {
               onSyncComplete();
             }
+            isInitial = false;
           } catch (err) {
             console.error(`Firebase Sync: Error processing update for ${storeName}:`, err);
           }
         }, error => {
           console.error(`Firebase Sync: error for ${storeName}:`, error);
+          if (isInitial && onSyncComplete) {
+            onSyncComplete();
+          }
+          isInitial = false;
         });
         
       this.syncUnsubscribes.push(unsub);

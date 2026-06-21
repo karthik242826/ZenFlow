@@ -1935,7 +1935,11 @@ async function handleAuthStateChanged(user) {
     setSplashLoading(false);
     showToast(`Welcome, ${user.displayName || user.email}! 🎉`);
 
-    // Start real-time sync with callback to reload data and render
+    // Load and render user-scoped data immediately before sync starts
+    await reloadData();
+    renderAll();
+
+    // Start real-time sync with callback to reload data and render on subsequent updates
     window.firebaseSync.startSync(async () => {
       await reloadData();
       renderAll();
@@ -1947,13 +1951,9 @@ async function handleAuthStateChanged(user) {
       window.firebaseSync.stopSync();
     }
 
-    // Reset the local DB back to the anonymous store and wipe in-memory
-    // state so the next user (or the login screen) starts completely fresh.
+    // Reset the local DB back to the anonymous store and reload guest data
     db.setUser(null);
-    state.timetable = [];
-    state.todos     = [];
-    state.notes     = [];
-    state.history   = [];
+    await reloadData();
 
     // Update cloud modal state
     if (DOM.cloudAuthSignedOut) DOM.cloudAuthSignedOut.style.display = 'block';
@@ -1966,7 +1966,7 @@ async function handleAuthStateChanged(user) {
 
     updateCloudStatus('local-auth-required');
 
-    // Re-render UI to show empty state
+    // Re-render UI
     renderAll();
   }
 }
